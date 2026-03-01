@@ -2,7 +2,6 @@ import os
 import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
-import asyncio
 
 from langchain_community.document_loaders import PDFPlumberLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -43,64 +42,58 @@ def get_vector_store() -> Chroma:
             raise
     return _vector_store
 
-async def process_document(file_path: str | Path) -> List[Document]:
+def process_document(file_path: str | Path) -> List[Document]:
     """
-    Load a document (PDF or TXT), split it into chunks, and return the chunks.
+    Basic document processing with standard chunking.
+    
+    Note: Enterprise version includes:
+    - Async thread-pool processing for high concurrency
+    - Adaptive chunking based on document structure
+    - Multi-modal content extraction (tables, images)
+    - Semantic boundary detection
     """
     file_path_str = str(file_path)
     
-    def _load_and_split() -> List[Document]:
-        # Document Loader
-        if file_path_str.lower().endswith(".pdf"):
-            loader = PDFPlumberLoader(file_path_str)
-        elif file_path_str.lower().endswith(".txt"):
-            loader = TextLoader(file_path_str, encoding='utf-8')
-        else:
-            raise ValueError(f"Unsupported file format: {file_path_str}")
-            
-        documents = loader.load()
+    # Basic document loading
+    if file_path_str.lower().endswith(".pdf"):
+        loader = PDFPlumberLoader(file_path_str)
+    elif file_path_str.lower().endswith(".txt"):
+        loader = TextLoader(file_path_str, encoding='utf-8')
+    else:
+        raise ValueError(f"Unsupported file format: {file_path_str}")
         
-        # BUG 7: 这里的分块参数可能不是最优的
-        # chunk_size 和 chunk_overlap 应该根据文档类型动态调整
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            separators=["\n\n", "\n", "。", "！", "？", " ", ""]
-        )
-        chunks = text_splitter.split_documents(documents)
-        
-        # BUG 8: 没有对空文档或分块失败的情况做处理
-        # 如果 chunks 为空，应该抛出异常或警告
-        
-        return chunks
+    documents = loader.load()
+    
+    # Basic fixed-size chunking (no advanced strategies)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    chunks = text_splitter.split_documents(documents)
+    
+    logger.info(f"Processed {file_path_str}: generated {len(chunks)} chunk(s).")
+    return chunks
 
-    try:
-        chunks = await asyncio.to_thread(_load_and_split)
-        logger.info(f"Processed {file_path_str}: generated {len(chunks)} chunk(s).")
-        return chunks
-    except Exception as e:
-        logger.error(f"Error processing document {file_path_str}: {e}")
-        raise
-
-async def add_document_to_knowledge_base(file_path: str | Path) -> int:
+def add_document_to_knowledge_base(file_path: str | Path) -> int:
     """
-    Process a document and add its embeddings to the ChromaDB vector store.
+    Basic synchronous document processing and storage.
+    
+    Note: Enterprise version uses async thread-pooling for:
+    - Non-blocking concurrent document processing
+    - Batch embedding optimization
+    - Real-time progress tracking
     """
     try:
-        chunks = await process_document(file_path)
+        chunks = process_document(file_path)
         if not chunks:
             logger.warning(f"No text chunks extracted from {file_path}")
             return 0
             
-        def _add_to_chroma():
-            vectorstore = get_vector_store()
-            vectorstore.add_documents(chunks)
-            # BUG 9: persist() 方法在新版本的 Chroma 中可能已经废弃
-            # 这里应该检查版本或使用新的持久化方法
-            if hasattr(vectorstore, 'persist'):
-                vectorstore.persist()
-                
-        await asyncio.to_thread(_add_to_chroma)
+        # Simple synchronous storage
+        vectorstore = get_vector_store()
+        vectorstore.add_documents(chunks)
+        if hasattr(vectorstore, 'persist'):
+            vectorstore.persist()
         
         logger.info(f"Successfully added {len(chunks)} chunks to ChromaDB from {file_path}")
         return len(chunks)
@@ -110,14 +103,25 @@ async def add_document_to_knowledge_base(file_path: str | Path) -> int:
 
 async def query_knowledge_base(question: str, k: int = 3) -> List[Dict[str, Any]]:
     """
-    Query the vector store for the most relevant document chunks.
+    Basic similarity search for document retrieval.
+    
+    Note: Enterprise version includes:
+    - Hybrid search (dense + sparse vectors)
+    - MMR (Maximal Marginal Relevance) for diversity
+    - Query expansion and rewriting
+    - Contextual re-ranking
+    
+    Args:
+        question: The user's query string.
+        k: The number of relevant documents to retrieve.
+        
+    Returns:
+        List of dictionaries containing matched text and metadata.
     """
     logger.info(f"Querying knowledge base for: '{question}' with k={k}")
     try:
         vectorstore = get_vector_store()
-        
-        # BUG 10: 这里直接使用 similarity_search，没有考虑使用 MMR 等更好的检索策略
-        # 可能导致检索结果重复度高
+        # Basic similarity search only
         docs = await vectorstore.asimilarity_search(question, k=k)
         
         results = []

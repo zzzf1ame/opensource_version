@@ -28,25 +28,28 @@ class DocumentListResponse(BaseModel):
 @router.post("/upload", response_model=UploadResponse)
 async def upload_document(file: UploadFile = File(...)):
     """
-    上传文档并进行向量化处理
+    Basic document upload and vectorization.
+    
+    Note: Enterprise version includes:
+    - File size validation and streaming for large files
+    - Virus scanning and content validation
+    - Duplicate detection
+    - Progress tracking with WebSocket
     """
     try:
-        # 验证文件类型
+        # Basic file type validation
         if not file.filename.endswith(('.pdf', '.txt')):
             raise HTTPException(status_code=400, detail="仅支持 PDF 和 TXT 文件")
         
-        # BUG 2: 这里没有检查文件大小，可能导致大文件上传失败
-        # 正确做法: 应该添加文件大小限制检查
-        
-        # 保存文件
+        # Save file (no size limit check in basic version)
         file_path = UPLOAD_DIR / file.filename
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
         logger.info(f"File saved: {file_path}")
         
-        # 处理文档并添加到知识库
-        chunks_count = await add_document_to_knowledge_base(file_path)
+        # Basic synchronous processing
+        chunks_count = add_document_to_knowledge_base(file_path)
         
         return UploadResponse(
             status="success",
@@ -60,21 +63,24 @@ async def upload_document(file: UploadFile = File(...)):
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_documents():
     """
-    获取已上传的文档列表
+    Basic document listing from file system.
+    
+    Note: Enterprise version provides:
+    - Real-time sync with vector database
+    - Document metadata and statistics
+    - Search and filtering capabilities
+    - Document versioning tracking
     """
     try:
-        # BUG 3: 这里的实现不完整，只是简单列出文件
-        # 实际应该从 ChromaDB 中获取准确的文档信息
+        # Simple file system listing
         uploaded_files = [f.name for f in UPLOAD_DIR.iterdir() if f.is_file()]
         
-        # 尝试获取总分块数（这里可能会出错）
+        # Basic chunk count estimation
         try:
             vectorstore = get_vector_store()
-            # BUG 4: 这个方法调用可能不存在，会导致错误
             total_chunks = vectorstore._collection.count()
         except:
-            # 出错时返回估算值
-            total_chunks = len(uploaded_files) * 10  # 粗略估算
+            total_chunks = len(uploaded_files) * 10
         
         return DocumentListResponse(
             documents=uploaded_files,

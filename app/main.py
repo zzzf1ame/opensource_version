@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 # 2. 初始化 FastAPI 应用实例
 # ==========================================
 app = FastAPI(
-    title="SmartDoc AI",
-    description="企业级 RAG 知识库问答系统后端 API",
-    version="0.9.0-beta"  # 开源版本号
+    title="SmartDoc AI - Basic Edition",
+    description="RAG 知识库问答系统 - 基础版本 | Enterprise features available for custom projects",
+    version="1.0.0-basic"
 )
 
 # ==========================================
@@ -62,9 +62,11 @@ from app.api.document import router as document_router
 @app.get("/", tags=["系统监控"])
 async def root():
     return {
-        "message": "Welcome to SmartDoc AI - Open Source Edition!",
-        "version": "0.9.0-beta",
-        "contact": "For commercial support, contact: [your-email@example.com]"
+        "message": "SmartDoc AI - Basic Edition",
+        "version": "1.0.0-basic",
+        "author": "暇格 (Zzzf1ame)",
+        "note": "This is the basic edition. Enterprise features (advanced anti-hallucination, async thread-pooling, hybrid search) available for custom projects.",
+        "contact": "38222540@qq.com"
     }
 
 # Register Routers
